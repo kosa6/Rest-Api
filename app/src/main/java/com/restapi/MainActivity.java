@@ -1,15 +1,15 @@
 package com.restapi;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.JsonReader;
 import android.util.Log;
 import android.view.View;
-import android.widget.Adapter;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ListView;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,10 +24,11 @@ import javax.net.ssl.HttpsURLConnection;
 
 public class MainActivity extends AppCompatActivity {
 
-    private Button startButton;
+    private Button startButton , showButton;
     private ProgressBar progressBar;
-    private TextView nameOfUser;
-    private ListView listView;
+    private TextView nameOfUser, userName,id,typeOfUser,followers;
+    private ImageView avatar;
+    private String[] information;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,28 +36,60 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         initUI();
         onClickButton();
+        onClickShowButton();
     }
     private void initUI(){
         startButton = findViewById(R.id.startButton);
+        showButton = findViewById(R.id.showInfo);
+        showButton.setVisibility(View.GONE);
         progressBar = findViewById(R.id.progressBar);
         nameOfUser = findViewById(R.id.nameOfAccount);
-        listView = findViewById(R.id.listView);
+        userName = findViewById(R.id.userName);
+        id = findViewById(R.id.id);
+        typeOfUser = findViewById(R.id.typeOfUser);
+        followers = findViewById(R.id.followers);
+        avatar = findViewById(R.id.avatar);
+        information = new String[5];
     }
     private void onClickButton(){
         startButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                MyAsyncTask myAsyncTask = new MyAsyncTask();
-                myAsyncTask.execute(nameOfUser.getText().toString());
+                startAsyncTask();
             }
         });
     }
-    private class MyAsyncTask extends AsyncTask<String, Integer, String> {
+    private void onClickShowButton(){
+        showButton.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                setUpInformation();
+            }
+        });
+    }
+    private void setUpInformation(){
+        userName.setText("Name: "+information[0]);
+        id.setText("Id: "+information[1]);
+        typeOfUser.setText("Type of account: "+information[3]);
+        followers.setText("Number of followers: "+information[4]);
+        new DownloadImageTask(avatar).execute(information[2]);
+    }
+    private void startAsyncTask(){
+        if(!nameOfUser.getText().toString().isEmpty()){
+            MyAsyncTask myAsyncTask = new MyAsyncTask();
+            myAsyncTask.execute(nameOfUser.getText().toString());
+        }
+        else{
+            Toast.makeText(MainActivity.this,"User name is ether null or empty", Toast.LENGTH_LONG).show();
+            Log.e("MainActivity","User name is ether null or empty");
+        }
+    }
+    private class MyAsyncTask extends AsyncTask<String, Integer, String[]> {
 
         JsonReader jsonReader;
         HttpsURLConnection myConnection;
         @Override
-        protected String doInBackground(String... integers) {
+        protected String[] doInBackground(String... integers) {
             try {
                 URL githubEndpoint = new URL("https://api.github.com/users/"+integers[0]);
                 myConnection = (HttpsURLConnection) githubEndpoint.openConnection();
@@ -69,7 +102,10 @@ public class MainActivity extends AppCompatActivity {
                     InputStreamReader responseBodyReader = new InputStreamReader(responseBody, "UTF-8");
                     jsonReader = new JsonReader(responseBodyReader);
                     Log.i("Tag","1");
-                    return extractFromJson(jsonReader,"bio");
+                    String[] info;
+                    String[] what = {"login","id","avatar_url","type","followers","oo"};
+                    info = extractFromJson(jsonReader,what);
+                    return info;
                 } else {
                     Log.d("Tag","wrong user name");
                     // Error handling code goes here
@@ -87,6 +123,11 @@ public class MainActivity extends AppCompatActivity {
             super.onPreExecute();
             progressBar.setProgress(0);
             progressBar.setVisibility(View.VISIBLE);
+            userName.setVisibility(View.GONE);
+            id.setVisibility(View.GONE);
+            typeOfUser.setVisibility(View.GONE);
+            followers.setVisibility(View.GONE);
+            avatar.setVisibility(View.GONE);
         }
 
         @Override
@@ -96,39 +137,72 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected void onPostExecute(String result) {
+        protected void onPostExecute(String[] result) {
             super.onPostExecute(result);
             if( isCancelled() ) {
                 return;
             }
-
             progressBar.setVisibility(View.GONE);
-            Toast.makeText(MainActivity.this, result, Toast.LENGTH_SHORT).show();
+            userName.setVisibility(View.VISIBLE);
+            id.setVisibility(View.VISIBLE);
+            typeOfUser.setVisibility(View.VISIBLE);
+            followers.setVisibility(View.VISIBLE);
+            avatar.setVisibility(View.VISIBLE);
+            Toast.makeText(MainActivity.this, "Done", Toast.LENGTH_SHORT).show();
+            information = result;
+            showButton.setVisibility(View.VISIBLE);
         }
-        private String extractFromJson(JsonReader jsonReader, String what){
+        private String[] extractFromJson(JsonReader jsonReader, String[] what){
             try {
+                String[] values = new String[what.length];
+                int index = 0 ;
                 jsonReader.beginObject(); // Start processing the JSON object
                 while (jsonReader.hasNext()) { // Loop through all keys
                     String key = jsonReader.nextName(); // Fetch the next key
-                    if (key.equals(what)) { // Check if desired key
+                    if (key.equals(what[index])) { // Check if desired key
                         // Fetch the value as a String
-                        String value;
                         try{
-                            value= jsonReader.nextString();
+                            values[index] = jsonReader.nextString();
+                            Log.i("valuse",values[index]);
                         }catch(IllegalStateException e){
-                            value = "null";
+                            values[index] = "null";
                         }
-                        return value;
+                        index++;
                         // Do something with the value
                         // ...
                     } else {
                         jsonReader.skipValue(); // Skip values of other keys
                     }
                 }
+                return values;
             } catch (IOException e) {
                 e.printStackTrace();
             }
             return null;
+        }
+    }
+    private class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
+        ImageView bmImage;
+
+        private DownloadImageTask(ImageView bmImage) {
+            this.bmImage = bmImage;
+        }
+
+        protected Bitmap doInBackground(String... urls) {
+            String urldisplay = urls[0];
+            Bitmap mIcon11 = null;
+            try {
+                InputStream in = new java.net.URL(urldisplay).openStream();
+                mIcon11 = BitmapFactory.decodeStream(in);
+            } catch (Exception e) {
+                Log.e("Error", e.getMessage());
+                e.printStackTrace();
+            }
+            return mIcon11;
+        }
+
+        protected void onPostExecute(Bitmap result) {
+            bmImage.setImageBitmap(result);
         }
     }
 }
