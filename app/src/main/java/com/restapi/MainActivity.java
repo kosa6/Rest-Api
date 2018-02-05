@@ -1,8 +1,11 @@
 package com.restapi;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Debug;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.JsonReader;
@@ -24,11 +27,14 @@ import javax.net.ssl.HttpsURLConnection;
 
 public class MainActivity extends AppCompatActivity {
 
-    private Button startButton , showButton;
+    private Button startButton , showButton, loginActivityButton;
     private ProgressBar progressBar;
     private TextView nameOfUser, userName,id,typeOfUser,followers;
     private ImageView avatar;
     private String[] information;
+
+    private String clientID = "006538d11e78ace0816f";
+    private String redirectUri = "restapi://callback";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,8 +43,16 @@ public class MainActivity extends AppCompatActivity {
         initUI();
         onClickButton();
         onClickShowButton();
+        onClickLoginButton();
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
     private void initUI(){
+        loginActivityButton = findViewById(R.id.Login);
         startButton = findViewById(R.id.startButton);
         showButton = findViewById(R.id.showInfo);
         showButton.setVisibility(View.GONE);
@@ -66,6 +80,17 @@ public class MainActivity extends AppCompatActivity {
                 setUpInformation();
             }
         });
+    }
+    private void onClickLoginButton() {
+        loginActivityButton.setOnClickListener(new View.OnClickListener(){
+            public void onClick(View view){ startLoginActivity(); }
+        });
+    }
+    private void startLoginActivity(){
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/login/oauth/authorize" + "?client_id=" + clientID +"&scope=repo%20delete_repo&redirect_uri=" + redirectUri));
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            startActivity(intent);
+        }
     }
     private void setUpInformation(){
         userName.setText("Name: "+information[0]);
@@ -142,17 +167,25 @@ public class MainActivity extends AppCompatActivity {
             if( isCancelled() ) {
                 return;
             }
-            progressBar.setVisibility(View.GONE);
-            userName.setVisibility(View.VISIBLE);
-            id.setVisibility(View.VISIBLE);
-            typeOfUser.setVisibility(View.VISIBLE);
-            followers.setVisibility(View.VISIBLE);
-            avatar.setVisibility(View.VISIBLE);
-            Toast.makeText(MainActivity.this, "Done", Toast.LENGTH_SHORT).show();
-            information = result;
-            showButton.setVisibility(View.VISIBLE);
+            if(result == null){
+                Log.i("User", "NOt Found0");
+                Toast.makeText(MainActivity.this,"User not found",Toast.LENGTH_LONG).show();
+                progressBar.setVisibility(View.GONE);
+                showButton.setVisibility(View.GONE);
+            }
+            else{
+                progressBar.setVisibility(View.GONE);
+                userName.setVisibility(View.VISIBLE);
+                id.setVisibility(View.VISIBLE);
+                typeOfUser.setVisibility(View.VISIBLE);
+                followers.setVisibility(View.VISIBLE);
+                avatar.setVisibility(View.VISIBLE);
+                Toast.makeText(MainActivity.this, "Done", Toast.LENGTH_SHORT).show();
+                information = result;
+                showButton.setVisibility(View.VISIBLE);
+            }
         }
-        private String[] extractFromJson(JsonReader jsonReader, String[] what){
+        public String[] extractFromJson(JsonReader jsonReader, String[] what){
             try {
                 String[] values = new String[what.length];
                 int index = 0 ;
